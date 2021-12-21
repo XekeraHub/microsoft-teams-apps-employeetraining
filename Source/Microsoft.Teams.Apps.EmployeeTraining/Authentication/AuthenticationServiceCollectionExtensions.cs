@@ -12,7 +12,6 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Authentication
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.IdentityModel.Tokens;
-    using Microsoft.Teams.Apps.EmployeeTraining.Helpers;
     using Microsoft.Teams.Apps.EmployeeTraining.Models.Configuration;
 
     /// <summary>
