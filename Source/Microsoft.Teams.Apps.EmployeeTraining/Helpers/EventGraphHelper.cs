@@ -107,7 +107,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             var teamsEvent = new Event
             {
                 Subject = eventEntity.Name,
-                ODataType = null,
+                AllowNewTimeProposals = false,
                 Body = new ItemBody
                 {
                     ContentType = BodyType.Html,
@@ -163,7 +163,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             var teamsEvent = new Event
             {
                 Subject = eventEntity.Name,
-                ODataType = null,
+                AllowNewTimeProposals = false,
 
                 Body = new ItemBody
                 {
