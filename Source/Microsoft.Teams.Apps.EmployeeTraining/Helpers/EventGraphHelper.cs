@@ -107,7 +107,6 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             var teamsEvent = new Event
             {
                 Subject = eventEntity.Name,
-                ODataType = null,
                 Body = new ItemBody
                 {
                     ContentType = BodyType.Html,
@@ -124,7 +123,6 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
                 }
                 :
                 null,
-                AllowNewTimeProposals = false,
                 IsOnlineMeeting = eventEntity.Type == (int)EventType.Teams,
                 OnlineMeetingProvider = eventEntity.Type == (int)EventType.Teams ? OnlineMeetingProviderType.TeamsForBusiness : OnlineMeetingProviderType.Unknown,
             };
@@ -164,7 +162,6 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             var teamsEvent = new Event
             {
                 Subject = eventEntity.Name,
-                ODataType = null,
                 Body = new ItemBody
                 {
                     ContentType = BodyType.Html,
@@ -178,7 +175,6 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
                     Address = new PhysicalAddress { Street = eventEntity.Venue },
                 }
                 : null,
-                AllowNewTimeProposals = false,
                 IsOnlineMeeting = eventEntity.Type == (int)EventType.Teams,
                 OnlineMeetingProvider = eventEntity.Type == (int)EventType.Teams ? OnlineMeetingProviderType.TeamsForBusiness : OnlineMeetingProviderType.Unknown,
             };
