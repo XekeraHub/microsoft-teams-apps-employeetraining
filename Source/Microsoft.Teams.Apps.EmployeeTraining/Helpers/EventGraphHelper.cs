@@ -23,11 +23,6 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
     public class EventGraphHelper : IEventGraphHelper
     {
         /// <summary>
-        /// Instance of graph service client for delegated requests.
-        /// </summary>
-        private readonly GraphServiceClient delegatedGraphClient;
-
-        /// <summary>
         /// Instance of graph service client for application level requests.
         /// </summary>
         private readonly GraphServiceClient applicationGraphClient;
@@ -41,6 +36,8 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// Graph helper for operations related user.
         /// </summary>
         private readonly IUserGraphHelper userGraphHelper;
+
+        private List<string> logs = new List<string>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventGraphHelper"/> class.
@@ -67,13 +64,13 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             {
                 var jwtToken = AuthenticationHeaderValue.Parse(httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString()).Parameter;
 
-                this.delegatedGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
-                {
-                    return await tokenAcquisitionHelper.GetUserAccessTokenAsync(userObjectId, jwtToken);
-                });
-
+                // this.delegatedGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
+                // {
+                //    return await tokenAcquisitionHelper.GetUserAccessTokenAsync(userObjectId, jwtToken);
+                // });
                 this.applicationGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
                 {
+                    this.logs.Add("in authentication token");
                     return await tokenAcquisitionHelper.GetApplicationAccessTokenAsync();
                 });
             }
@@ -88,9 +85,10 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// <returns>True if event cancellation is successful.</returns>
         public async Task<bool> CancelEventAsync(string eventGraphId, string createdByUserId, string comment)
         {
+            this.logs.Add("in cancel event");
             await this.applicationGraphClient.Users[createdByUserId].Events[eventGraphId]
                 .Cancel(comment).Request().PostAsync();
-
+            this.logs.Add("after canel token");
             return true;
         }
 
@@ -101,53 +99,63 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// <returns>Created event details.</returns>
         public async Task<Event> CreateEventAsync(EventEntity eventEntity)
         {
-            eventEntity = eventEntity ??
-                throw new ArgumentNullException(nameof(eventEntity), "Event details cannot be null");
-
-            var teamsEvent = new Event
+            try
             {
-                Subject = eventEntity.Name,
-                ODataType = null,
-                Body = new ItemBody
+                this.logs.Add("Starting creating event");
+                eventEntity = eventEntity ??
+    throw new ArgumentNullException(nameof(eventEntity), "Event details cannot be null");
+
+                var teamsEvent = new Event
                 {
-                    ContentType = BodyType.Html,
-                    Content = this.GetEventBodyContent(eventEntity),
-                },
-                Attendees = eventEntity.IsAutoRegister && eventEntity.Audience == (int)EventAudience.Private ?
-                    await this.GetEventAttendeesTemplateAsync(eventEntity) :
-                    new List<Attendee>(),
-                OnlineMeetingUrl = eventEntity.Type == (int)EventType.LiveEvent ? eventEntity.MeetingLink : null,
-                IsReminderOn = true,
-                Location = eventEntity.Type == (int)EventType.InPerson ? new Location
+                    AllowNewTimeProposals = false,
+                    Subject = eventEntity.Name,
+                    Body = new ItemBody
+                    {
+                        ContentType = BodyType.Html,
+                        Content = this.GetEventBodyContent(eventEntity),
+                    },
+                    Attendees = eventEntity.IsAutoRegister && eventEntity.Audience == (int)EventAudience.Private ?
+                        await this.GetEventAttendeesTemplateAsync(eventEntity) :
+                        new List<Attendee>(),
+                    OnlineMeetingUrl = eventEntity.Type == (int)EventType.LiveEvent ? eventEntity.MeetingLink : null,
+                    IsReminderOn = true,
+                    Location = eventEntity.Type == (int)EventType.InPerson ? new Location
+                    {
+                        Address = new PhysicalAddress { Street = eventEntity.Venue },
+                    }
+                    :
+                    null,
+                    IsOnlineMeeting = eventEntity.Type == (int)EventType.Teams,
+                    OnlineMeetingProvider = eventEntity.Type == (int)EventType.Teams ? OnlineMeetingProviderType.TeamsForBusiness : OnlineMeetingProviderType.Unknown,
+                };
+
+                teamsEvent.Start = new DateTimeTimeZone
                 {
-                    Address = new PhysicalAddress { Street = eventEntity.Venue },
+                    DateTime = eventEntity.StartDate?.ToString("s", CultureInfo.InvariantCulture),
+                    TimeZone = TimeZoneInfo.Utc.Id,
+                };
+                teamsEvent.End = new DateTimeTimeZone
+                {
+                    DateTime = eventEntity.StartDate.Value.Date.Add(
+                    new TimeSpan(eventEntity.EndTime.Hour, eventEntity.EndTime.Minute, eventEntity.EndTime.Second)).ToString("s", CultureInfo.InvariantCulture),
+                    TimeZone = TimeZoneInfo.Utc.Id,
+                };
+
+                if (eventEntity.NumberOfOccurrences > 1)
+                {
+                    // Create recurring event.
+                    teamsEvent = this.GetRecurringEventTemplate(teamsEvent, eventEntity);
                 }
-                :
-                null,
-                IsOnlineMeeting = eventEntity.Type == (int)EventType.Teams,
-                OnlineMeetingProvider = eventEntity.Type == (int)EventType.Teams ? OnlineMeetingProviderType.TeamsForBusiness : OnlineMeetingProviderType.Unknown,
-            };
 
-            teamsEvent.Start = new DateTimeTimeZone
-            {
-                DateTime = eventEntity.StartDate?.ToString("s", CultureInfo.InvariantCulture),
-                TimeZone = TimeZoneInfo.Utc.Id,
-            };
-            teamsEvent.End = new DateTimeTimeZone
-            {
-                DateTime = eventEntity.StartDate.Value.Date.Add(
-                new TimeSpan(eventEntity.EndTime.Hour, eventEntity.EndTime.Minute, eventEntity.EndTime.Second)).ToString("s", CultureInfo.InvariantCulture),
-                TimeZone = TimeZoneInfo.Utc.Id,
-            };
-
-            if (eventEntity.NumberOfOccurrences > 1)
-            {
-                // Create recurring event.
-                teamsEvent = this.GetRecurringEventTemplate(teamsEvent, eventEntity);
+                this.logs.Add("just before creating event");
+                return await this.applicationGraphClient.Me.Events.Request()
+                    .Header("Prefer", $"outlook.timezone=\"{TimeZoneInfo.Utc.Id}\"").AddAsync(teamsEvent);
+                this.logs.Add("just after creating event");
             }
-
-            return await this.delegatedGraphClient.Me.Events.Request()
-                .Header("Prefer", $"outlook.timezone=\"{TimeZoneInfo.Utc.Id}\"").AddAsync(teamsEvent);
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
         }
 
         /// <summary>
@@ -157,51 +165,60 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// <returns>Updated event details.</returns>
         public async Task<Event> UpdateEventAsync(EventEntity eventEntity)
         {
-            eventEntity = eventEntity ??
+            try
+            {
+                this.logs.Add("before updating event");
+                eventEntity = eventEntity ??
                 throw new ArgumentNullException(nameof(eventEntity), "Event details cannot be null");
 
-            var teamsEvent = new Event
-            {
-                Subject = eventEntity.Name,
-                ODataType = null,
+                var teamsEvent = new Event
+                {
+                    AllowNewTimeProposals = false,
+                    Subject = eventEntity.Name,
+                    Body = new ItemBody
+                    {
+                        ContentType = BodyType.Html,
+                        Content = this.GetEventBodyContent(eventEntity),
+                    },
+                    Attendees = await this.GetEventAttendeesTemplateAsync(eventEntity),
+                    OnlineMeetingUrl = eventEntity.Type == (int)EventType.LiveEvent ? eventEntity.MeetingLink : null,
+                    IsReminderOn = true,
+                    Location = eventEntity.Type == (int)EventType.InPerson ? new Location
+                    {
+                        Address = new PhysicalAddress { Street = eventEntity.Venue },
+                    }
+                    : null,
+                    IsOnlineMeeting = eventEntity.Type == (int)EventType.Teams,
+                    OnlineMeetingProvider = eventEntity.Type == (int)EventType.Teams ? OnlineMeetingProviderType.TeamsForBusiness : OnlineMeetingProviderType.Unknown,
+                };
 
-                Body = new ItemBody
+                teamsEvent.Start = new DateTimeTimeZone
                 {
-                    ContentType = BodyType.Html,
-                    Content = this.GetEventBodyContent(eventEntity),
-                },
-                Attendees = await this.GetEventAttendeesTemplateAsync(eventEntity),
-                OnlineMeetingUrl = eventEntity.Type == (int)EventType.LiveEvent ? eventEntity.MeetingLink : null,
-                IsReminderOn = true,
-                Location = eventEntity.Type == (int)EventType.InPerson ? new Location
+                    DateTime = eventEntity.StartDate?.ToString("s", CultureInfo.InvariantCulture),
+                    TimeZone = TimeZoneInfo.Utc.Id,
+                };
+                teamsEvent.End = new DateTimeTimeZone
                 {
-                    Address = new PhysicalAddress { Street = eventEntity.Venue },
+                    DateTime = eventEntity.StartDate.Value.Date.Add(
+                    new TimeSpan(eventEntity.EndTime.Hour, eventEntity.EndTime.Minute, eventEntity.EndTime.Second)).ToString("s", CultureInfo.InvariantCulture),
+                    TimeZone = TimeZoneInfo.Utc.Id,
+                };
+
+                if (eventEntity.NumberOfOccurrences > 1)
+                {
+                    // Create recurring event.
+                    teamsEvent = this.GetRecurringEventTemplate(teamsEvent, eventEntity);
                 }
-                : null,
-                IsOnlineMeeting = eventEntity.Type == (int)EventType.Teams,
-                OnlineMeetingProvider = eventEntity.Type == (int)EventType.Teams ? OnlineMeetingProviderType.TeamsForBusiness : OnlineMeetingProviderType.Unknown,
-            };
 
-            teamsEvent.Start = new DateTimeTimeZone
-            {
-                DateTime = eventEntity.StartDate?.ToString("s", CultureInfo.InvariantCulture),
-                TimeZone = TimeZoneInfo.Utc.Id,
-            };
-            teamsEvent.End = new DateTimeTimeZone
-            {
-                DateTime = eventEntity.StartDate.Value.Date.Add(
-                new TimeSpan(eventEntity.EndTime.Hour, eventEntity.EndTime.Minute, eventEntity.EndTime.Second)).ToString("s", CultureInfo.InvariantCulture),
-                TimeZone = TimeZoneInfo.Utc.Id,
-            };
-
-            if (eventEntity.NumberOfOccurrences > 1)
-            {
-                // Create recurring event.
-                teamsEvent = this.GetRecurringEventTemplate(teamsEvent, eventEntity);
+                this.logs.Add("just before updating event");
+                return await this.applicationGraphClient.Users[eventEntity.CreatedBy].Events[eventEntity.GraphEventId].Request()
+                    .Header("Prefer", $"outlook.timezone=\"{TimeZoneInfo.Utc.Id}\"").UpdateAsync(teamsEvent);
+                this.logs.Add("just after updating event");
             }
-
-            return await this.applicationGraphClient.Users[eventEntity.CreatedBy].Events[eventEntity.GraphEventId].Request()
-                .Header("Prefer", $"outlook.timezone=\"{TimeZoneInfo.Utc.Id}\"").UpdateAsync(teamsEvent);
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
         }
 
         /// <summary>
