@@ -154,7 +154,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception(string.Join("\n", this.logs.ToArray()) + ex.Message);
             }
         }
 
@@ -217,7 +217,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception(string.Join("\n", this.logs.ToArray()) + ex.Message);
             }
         }
 
