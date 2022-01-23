@@ -27,6 +27,8 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// </summary>
         private readonly GraphServiceClient applicationGraphClient;
 
+        private readonly GraphServiceClient delegatedGraphClient;
+
         /// <summary>
         /// The current culture's string localizer
         /// </summary>
@@ -64,10 +66,10 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             {
                 var jwtToken = AuthenticationHeaderValue.Parse(httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString()).Parameter;
 
-                // this.delegatedGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
-                // {
-                //    return await tokenAcquisitionHelper.GetUserAccessTokenAsync(userObjectId, jwtToken);
-                // });
+                this.delegatedGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
+                {
+                    return await tokenAcquisitionHelper.GetUserAccessTokenAsync(userObjectId, jwtToken);
+                });
                 this.applicationGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
                 {
                     this.logs.Add("in authentication token");
@@ -148,7 +150,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
                 }
 
                 this.logs.Add("just before creating event");
-                return await this.applicationGraphClient.Me.Events.Request()
+                return await this.delegatedGraphClient.Me.Events.Request()
                     .Header("Prefer", $"outlook.timezone=\"{TimeZoneInfo.Utc.Id}\"").AddAsync(teamsEvent);
                 this.logs.Add("just after creating event");
             }
@@ -211,7 +213,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
                 }
 
                 this.logs.Add("just before updating event");
-                return await this.applicationGraphClient.Users[eventEntity.CreatedBy].Events[eventEntity.GraphEventId].Request()
+                return await this.delegatedGraphClient.Users[eventEntity.CreatedBy].Events[eventEntity.GraphEventId].Request()
                     .Header("Prefer", $"outlook.timezone=\"{TimeZoneInfo.Utc.Id}\"").UpdateAsync(teamsEvent);
                 this.logs.Add("just after updating event");
             }
