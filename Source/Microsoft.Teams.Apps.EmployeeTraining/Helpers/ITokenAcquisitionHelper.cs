@@ -24,5 +24,11 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// <param name="jwtToken">Id token of user.</param>
         /// <returns>Token with graph scopes.</returns>
         Task<string> GetUserAccessTokenAsync(string userAadId, string jwtToken);
+
+        /// <summary>
+        /// Returns the logs
+        /// </summary>
+        /// <returns>return the logs</returns>
+        public string GetLogs();
     }
 }

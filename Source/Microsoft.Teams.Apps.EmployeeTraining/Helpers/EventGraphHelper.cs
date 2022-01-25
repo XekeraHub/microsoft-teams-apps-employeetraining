@@ -65,15 +65,18 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             if (!string.IsNullOrEmpty(userObjectId))
             {
                 var jwtToken = AuthenticationHeaderValue.Parse(httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString()).Parameter;
-
                 this.delegatedGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
                 {
-                    return await tokenAcquisitionHelper.GetUserAccessTokenAsync(userObjectId, jwtToken);
+                    var result = await tokenAcquisitionHelper.GetUserAccessTokenAsync(userObjectId, jwtToken);
+                    this.logs.Add(tokenAcquisitionHelper.GetLogs());
+                    return result;
                 });
                 this.applicationGraphClient = GraphServiceClientFactory.GetAuthenticatedGraphClient(async () =>
                 {
                     this.logs.Add("in authentication token");
-                    return await tokenAcquisitionHelper.GetApplicationAccessTokenAsync();
+                    var result = await tokenAcquisitionHelper.GetApplicationAccessTokenAsync();
+                    this.logs.Add(tokenAcquisitionHelper.GetLogs());
+                    return result;
                 });
             }
         }

@@ -20,6 +20,11 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// <summary>
         /// Represents scopes required by MsalNet for accessing token.
         /// </summary>
+        private readonly List<string> messages = new List<string>();
+
+        /// <summary>
+        /// Represents scopes required by MsalNet for accessing token.
+        /// </summary>
         private readonly string[] scopesRequestedByMsalNet = new string[]
         {
             "openid",
@@ -69,6 +74,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
             try
             {
                 List<string> scopeList = this.azureSettings.Value.GraphScope.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                this.messages.Add(this.azureSettings.Value.GraphScope);
 
                 // Gets user account from the accounts available in token cache.
                 // https://docs.microsoft.com/en-us/dotnet/api/microsoft.identity.client.clientapplicationbase.getaccountasync?view=azure-dotnet
@@ -78,15 +84,21 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
 
                 // Attempts to acquire an access token for the account from the user token cache.
                 // https://docs.microsoft.com/en-us/dotnet/api/microsoft.identity.client.clientapplicationbase.acquiretokensilent?view=azure-dotnet
+                this.messages.Add("Acquire token silent");
                 AuthenticationResult result = await this.confidentialClientApp
                     .AcquireTokenSilent(scopeList, account)
                     .ExecuteAsync();
+                this.messages.Add("Acquired token silent");
                 return result.AccessToken;
             }
-            catch (MsalUiRequiredException)
+            catch (MsalUiRequiredException ex)
             {
+                this.messages.Add("exception token silent");
+                this.messages.Add(ex.Message);
+
                 // If token does no exist in cache then get token on behalf of user.
                 return await this.AquireTokenOnBehalfOfUserAsync(this.azureSettings.Value.GraphScope, jwtToken);
+                this.messages.Add("Acquire token on behalf done");
             }
         }
 
@@ -96,12 +108,22 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// <returns>Access token with Graph scopes.</returns>
         public async Task<string> GetApplicationAccessTokenAsync()
         {
+            this.messages.Add("Access token client app");
             AuthenticationResult result = await this.confidentialClientApp
                 .AcquireTokenForClient(this.applicationScopesList)
                 .WithAuthority($"https://login.microsoftonline.com/{this.azureSettings.Value.TenantId}")
                 .ExecuteAsync();
-
+            this.messages.Add("Got the access token");
             return result.AccessToken;
+        }
+
+        /// <summary>
+        /// Returns the logs
+        /// </summary>
+        /// <returns>return the logs</returns>
+        public string GetLogs()
+        {
+            return string.Join("\n", this.messages);
         }
 
         /// <summary>
@@ -112,16 +134,30 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         /// <returns>Token with graph scopes.</returns>
         private async Task<string> AquireTokenOnBehalfOfUserAsync(string graphScopes, string jwtToken)
         {
+            this.messages.Add("Acquire token on behalf of user async");
+
             graphScopes = graphScopes ?? throw new ArgumentNullException(nameof(graphScopes));
             jwtToken = jwtToken ?? throw new ArgumentNullException(nameof(jwtToken));
             UserAssertion userAssertion = new UserAssertion(jwtToken, "urn:ietf:params:oauth:grant-type:jwt-bearer");
             IEnumerable<string> requestedScopes = graphScopes.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            this.messages.Add("in acquire token ");
+            this.messages.Add("graph scopes");
+            this.messages.Add(graphScopes);
+
+            this.messages.Add("requested scopes");
+            this.messages.Add(string.Join(" ", requestedScopes));
+            this.messages.Add("scopes requested by msal net");
+            this.messages.Add(string.Join(" ", this.scopesRequestedByMsalNet));
 
             // Result to make sure that the cache is filled-in before the controller tries to get access tokens
             var result = await this.confidentialClientApp.AcquireTokenOnBehalfOf(
                 requestedScopes.Except(this.scopesRequestedByMsalNet),
                 userAssertion)
                 .ExecuteAsync();
+
+            this.messages.Add("access token");
+            this.messages.Add(result.AccessToken);
+
             return result.AccessToken;
         }
     }
