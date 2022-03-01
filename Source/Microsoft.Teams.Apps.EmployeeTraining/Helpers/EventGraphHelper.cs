@@ -76,6 +76,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
                     this.logs.Add("in authentication token");
                     var result = await tokenAcquisitionHelper.GetApplicationAccessTokenAsync();
                     this.logs.Add(tokenAcquisitionHelper.GetLogs());
+                    this.logs.Add("after ----- in authentication token");
                     return result;
                 });
             }
@@ -106,7 +107,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         {
             try
             {
-                this.logs.Add("Starting creating event");
+                this.logs.Add("---------------- Starting creating event");
                 eventEntity = eventEntity ??
     throw new ArgumentNullException(nameof(eventEntity), "Event details cannot be null");
 
@@ -172,7 +173,7 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
         {
             try
             {
-                this.logs.Add("before updating event");
+                this.logs.Add("-----     before updating event");
                 eventEntity = eventEntity ??
                 throw new ArgumentNullException(nameof(eventEntity), "Event details cannot be null");
 
@@ -215,10 +216,10 @@ namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
                     teamsEvent = this.GetRecurringEventTemplate(teamsEvent, eventEntity);
                 }
 
-                this.logs.Add("just before updating event");
+                this.logs.Add("---------- just before updating event");
                 return await this.delegatedGraphClient.Users[eventEntity.CreatedBy].Events[eventEntity.GraphEventId].Request()
                     .Header("Prefer", $"outlook.timezone=\"{TimeZoneInfo.Utc.Id}\"").UpdateAsync(teamsEvent);
-                this.logs.Add("just after updating event");
+                this.logs.Add("--------- just after updating event");
             }
             catch (Exception ex)
             {

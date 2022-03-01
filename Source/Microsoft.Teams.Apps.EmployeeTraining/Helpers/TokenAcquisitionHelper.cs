@@ -4,6 +4,9 @@
 
 namespace Microsoft.Teams.Apps.EmployeeTraining.Helpers
 {
+#pragma warning disable IDE0005 // Using directive is unnecessary.
+    using global::Azure.Identity;
+#pragma warning restore IDE0005 // Using directive is unnecessary.
     using System;
     using System.Collections.Generic;
     using System.Linq;
